@@ -1,51 +1,69 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    https://shiny.posit.co/
-#
-
 library(shiny)
+library(ggplot2)
+library(dplyr)
+library(readr)
 
-# Define UI for application that draws a histogram
+# Load default data
+default_data <- read_csv("medical_data.csv")
+
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("Old Faithful Geyser Data"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
+  titlePanel("Data Analytics Dashboard"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      uiOutput("varselect_x"),
+      uiOutput("varselect_y"),
+      actionButton("update", "Update Plots")
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Summary Stats", 
+                 h4("Summary of Dataset"),
+                 verbatimTextOutput("summary"),
+                 h4("First 10 Rows"),
+                 tableOutput("data_head")),
+        tabPanel("Histogram", plotOutput("histPlot")),
+        tabPanel("Scatter Plot", plotOutput("scatterPlot"))
+      )
     )
+  )
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white',
-             xlab = 'Waiting time to next eruption (in mins)',
-             main = 'Histogram of waiting times')
-    })
+server <- function(input, output, session) {
+  data <- reactive({
+    default_data
+  })
+  
+  output$data_head <- renderTable({
+    head(data(), 10)
+  })
+  
+  output$summary <- renderPrint({
+    summary(data())
+  })
+  
+  output$varselect_x <- renderUI({
+    selectInput("xcol", "X Variable", names(data()))
+  })
+  
+  output$varselect_y <- renderUI({
+    selectInput("ycol", "Y Variable", names(data()))
+  })
+  
+  output$histPlot <- renderPlot({
+    req(input$xcol)
+    ggplot(data(), aes_string(x = input$xcol)) +
+      geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+      theme_minimal()
+  })
+  
+  output$scatterPlot <- renderPlot({
+    req(input$xcol, input$ycol)
+    ggplot(data(), aes_string(x = input$xcol, y = input$ycol)) +
+      geom_point(color = "tomato") +
+      theme_minimal()
+  })
 }
 
-# Run the application 
 shinyApp(ui = ui, server = server)
